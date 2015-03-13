@@ -4,5 +4,6 @@
   (:require [clj-sockets.core :as sock])
   (:require [clojure.tools.namespace.repl :refer [refresh]]))
 
+(load "helper")
 (load "server")
 (load "client")
