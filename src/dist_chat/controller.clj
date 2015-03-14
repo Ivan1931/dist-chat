@@ -1,5 +1,6 @@
 (ns dist-chat.core
-  (:require [clojure.core.match :refer [match]]
+  (:require [clojure.string :as string :refer [join]]
+            [clojure.core.match :refer [match]]
             [clojure.data.json :as json]))
 
 (defn send-message
@@ -8,8 +9,8 @@
   (let [json-message (json/write-str {:message message})
         string (str json-message "\n" :done)
         socket (create-socket host port)]
-    (do (write-to socket string)
-        (.close socket))))
+        (write-to socket string)
+        (.close socket)))
 
 ;;Dummy contact request until I set that up
 (defn perform-contact-request
@@ -28,7 +29,7 @@
   (let [command (json/read-json commad-string)]
     (match [command]
            [{:send-message data}] 
-           (future (send-message data))
+               (future (send-message data))
            [{:request-contact data}] 
            (let [contact-data (perform-contact-request data)]
              (write-to socket contact-data))
@@ -38,16 +39,10 @@
 
 (defn controller-dispatch
   [socket]
-  (let [in (BufferedReader. (reader socket))]
-    (loop [line (.readLine in)
-           command-string line]
-      (if (= line ":done")
-        (do (perform-command socket command-string)
-            (.close in)
-            (.close socket)
-            command-string)
-        (recur (.readLine in) 
-               (str command-string line))))))
+  (loop [predicate (fn [line] (= ":done" line))
+         command-lines (read-until socket predicate)
+         command-string (string/join "\n" command-lines)]
+        (perform-command socket command-string)))
 
 (defn create-controller-server
   [port]

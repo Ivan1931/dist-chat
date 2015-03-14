@@ -5,11 +5,11 @@
             [dist-chat.core :refer :all]))
 
 (def msg (promise))
-(def controller-port 8888)
-(def reciever-port 8889)
+(def controller-port 7888)
+(def reciever-port 7889)
 (def test-message "Hello")
-(def expected-msg (str "{message:\"" test-message "\"}\n:done"))
-(def send-msg-test-string (str (json/write-str {:send-message {:port reciever-port :host "localhost" :message test-message}}) "\n:done"))
+(def expected-msg (str (json/write-str {:message test-message}) "\n" :done))
+(def send-msg-test-string (str (json/write-str {:send-message {:port reciever-port :host "localhost" :message test-message}}) "\n" :done))
 
 (defmacro dbg
   [debug-message & form]
@@ -31,8 +31,8 @@
 (setup-command-dispatch-test controller-port reciever-port)
 
 (let [socket (create-socket "localhost" controller-port)]
-  (do (write-to socket send-msg-test-string)
-      (.close socket)))
+      (write-to socket send-msg-test-string)
+      (.close socket))
 
 (deftest dispatch-message-send-test
   (is (= @msg expected-msg)))

@@ -41,7 +41,7 @@
         (.close out))))
 
 (defn read-lines
-  "Reads n lines from a socket"
+  "Reads n lines from a socket. Blocks until n lines are provided"
   [socket n]
   (let [in (BufferedReader. (reader socket))]
     (loop [i n
@@ -54,36 +54,13 @@
 
 (defn read-until
   "Reads lines from socket until a line appears that satisfies the predicate.
-  Once the reading is done, will return lines read as a predicate"
+  Once the reading is done, will return lines read as a predicate.
+  Blocks until predicate is satisfied"
   [socket predicate]
   (let [in (BufferedReader. (reader socket))]
     (loop [lines []]
-      (let [line (BufferedReader. (reader socket))]
+      (let [line (.readLine in)]
         (if (predicate line)
-          lines
+          (do (.close in)
+              lines)
           (recur (conj lines line)))))))
-
-(defn read-line-from
-  "Reads a single line from our socket"
-  [socket]
-  (read-lines socket 1))
-
-(defn echo-dispatch
-  [socket]
-  (let [d (rand)
-        out (BufferedWriter. (writer socket))
-        in  (BufferedReader. (reader socket))]
-    (loop [line (.readLine in)]
-      (if (= line "CLOSE")
-        (do 
-          (println "Client closed connection")
-          (do-repeatedly .close out in socket))
-        (do 
-          (.write out (str "Echo " d " " line "\n"))
-          (.flush out)
-          (println d " echoed " line)
-          (recur (.readLine in)))))))
-
-(defn echo-server
-  [port]
-  (create-server port echo-dispatch))
