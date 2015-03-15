@@ -42,7 +42,7 @@
               prom
               (deliver prom :timeout))))))
 
-(defn message-reciever-dispatch
+(defn test-message-reciever-dispatch
   [socket]
   (let [lines (string/join "\n" (read-lines socket 2))]
     (do (deliver msg lines)
@@ -51,7 +51,7 @@
 (defn send-and-recieve-message
   [controller-port reciever-port message-command]
   (let [reciever-worker (future (create-server reciever-port 
-                                               message-reciever-dispatch))
+                                               test-message-reciever-dispatch))
         socket (create-socket "localhost" controller-port)
         write-worker (write-to socket message-command)]
     (do (write-worker)
