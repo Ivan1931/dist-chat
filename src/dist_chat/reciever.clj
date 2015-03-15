@@ -16,41 +16,47 @@
        (catch Exception d (Date. ))))
 
 (def vec-conj (comp vec conj))
+(def set-conj (comp set conj))
 
 (defn add-message-to-contact
-  [{date :date message :message sender-alias :alias} contact]
-  (assoc contact :messages (fn [messages] (vec-conj {:date date :message message :alias sender-alias}))))
+  [contacts contact {date :date message :message sender-alias :alias}]
+  (update-in contacts [contact :messages] (fn [messages] (vec-conj {:date date :message message :alias sender-alias}))))
 
 (defn add-alias-to-contact
-  [sender-alias contact]
-  (assoc contact :alias (fn [aliases] (conj aliases sender-alias))))
+  [contacts contact sender-alias]
+  (update-in contacts [contact :aliases] (fn [aliases] (set-conj aliases sender-alias))))
 
 (defn update-contact
-  [contact message]
-  (match [message]
-         [{:date date :message message :alias sender-alias}]
-         (let [formatted-date (parse-date-or-now date)
-               update-messages (fn [contacts] 
-                                 (update-in contact 
-                                            (partial add-message-to-contact 
-                                                     {:date formatted-date 
-                                                      :message message 
-                                                      :alias sender-alias})))
-               update-aliases (fn [contacts] 
-                                (update-in contact 
-                                           (partial add-alias-to-contact 
-                                                    sender-alias)))]
-           (dosync (alter contacts update-messages)
-                   (alter contacts update-aliases)))))
+  [contact {date :date message :message sender-alias :alias}]
+  (let [formatted-date (parse-date-or-now date)
+        final-message {:date formatted-date
+                       :message message
+                       :alias sender-alias}]
+    (dosync (println "Our data " date " " message " " sender-alias)
+            (println "Contacts " contacts " Derefed" @contacts)
+            (try 
+              (if (contains? @contacts contact)
+                (alter add-message-to-contact
+                       contact
+                       final-message)
+                (alter contacts 
+                       conj
+                       {contact {:message [final-message] 
+                                 :aliases #{sender-alias}}}))
+              (catch Exception e (println (.printStackTrace e))))
+            (alter contacts 
+                   add-alias-to-contact
+                   contact
+                   sender-alias))))
 
-(defn message-reciever-dispatch
+(defn inbox-dispatch
   [socket]
   (let [stop-predicate (fn [line] (= line ":done"))
-        message (read-until socket stop-predicate)
-        message-data (json/read-str message)
-        contact (->> socket .getInetAddress .toString)]
-    (update-contact contact message-data)))
+        message (make-command (read-until socket stop-predicate))
+        contact (->> socket .getInetAddress .toString)
+        message-data (json/read-json message)]
+    (before (type message-data) update-contact (dbg contact) (dbg message-data))))
 
-(defn create-message-listener
+(defn create-inbox-server
   [port]
-  (create-server port message-reciever-dispatch))
+  (create-server port inbox-dispatch))

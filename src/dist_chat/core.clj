@@ -12,8 +12,17 @@
 
 (defmacro before
   [message & form]
-  `(do (println "Message is: " ~message)
+  `(do (println (quote ~message) " ->\n" ~message "\n")
        ~form))
+
+(defmacro dbg [body]
+  `(let [x# ~body]
+     (println "dbg:" '~body "=" x#)
+     x#))
+
+(defmacro do-repeatedly
+  [f & args]
+  `(do ~@(map (fn [o] `(~f ~o)) args)))
 
 (defmacro after
   [message & form]

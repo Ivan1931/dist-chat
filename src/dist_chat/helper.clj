@@ -28,9 +28,6 @@
       (let [socket (.accept server)]
         (create-dispatch socket dispatch)))))
 
-(defmacro do-repeatedly
-  [f & args]
-  `(do ~@(map (fn [o] `(~f ~o)) args)))
 
 (defn write-to
   "Writes the specified string to the socket"
@@ -78,3 +75,11 @@
         (do 
           (.write out (str "Echo " d " " line "\n"))
           (.flush out))))))
+
+(defn message-encase
+  [message]
+  (str message "\n" :done))
+
+(defn make-command
+  [command-lines]
+  (string/join "\n" command-lines))

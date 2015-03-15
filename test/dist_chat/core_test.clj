@@ -54,13 +54,37 @@
         (.close socket)
         (do-repeatedly future-cancel reciever-worker write-worker))))
 
-(run-controller-test controller-port nil msg 1000
+(comment (run-controller-test controller-port nil msg 1000
                   send-and-recieve-message 
                   controller-port
                   reciever-port 
                   send-msg-test-string)
 
 (deftest dispatch-message-send-test
-  (is (= (@msg :message) test-message)))
+  (is (= (@msg :message) test-message))))
+
+(def inbox (promise))
+(def inbox-port 7990)
+(def controller-port-2 7991)
+
+(defn run-inbox-test
+  [inbox-port controller-port]
+  (let [controller-server (future (create-controller-server controller-port-2))
+        inbox-server (future (create-inbox-server inbox-port))
+        socket (create-socket "localhost" controller-port)
+        command {:send-message {:port inbox-port :message test-message :host "localhost"}}
+        message (message-encase (json/write-str command))]
+    (do (write-to socket message)
+        (Thread/sleep 100)
+        (.close socket)
+        (future-cancel inbox-server)
+        (future-cancel controller-server))))
+
+(run-inbox-test inbox-port controller-port-2)
+
+(deftest inbox-reciept-updates-contacts-test
+  (is (empty? @contacts)))
+
+(println @contacts)
 
 (run-tests 'dist-chat.core-test)

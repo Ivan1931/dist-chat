@@ -40,7 +40,7 @@
   (let [command (json/read-json commad-string)]
     (match [command]
            [{:send-message data}] 
-           (before "Executing message command" future (send-message data))
+           (before (str data) future (send-message data))
            [{:request-contacts data}] 
            (let [contact-data (perform-contact-request data)]
              (write-to socket contact-data)))))
@@ -48,9 +48,9 @@
 (defn controller-dispatch
   [socket]
   (loop [predicate (fn [line] (= ":done" line))
-         command-lines (read-until socket predicate)
-         command-string (string/join "\n" command-lines)]
-    (perform-command socket command-string)))
+         command-lines (before "Beginning read" read-until socket predicate)
+         command-string (before (str "Command lines " command-lines) make-command command-lines)]
+    (perform-command (dbg socket) (dbg command-string))))
 
 (defn create-controller-server
   [port]
