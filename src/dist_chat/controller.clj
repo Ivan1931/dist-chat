@@ -48,9 +48,9 @@
 (defn controller-dispatch
   [socket]
   (loop [predicate (fn [line] (= ":done" line))
-         command-lines (before "Beginning read" read-until socket predicate)
+         command-lines (read-until socket predicate)
          command-string (before (str "Command lines " command-lines) make-command command-lines)]
-    (perform-command (dbg socket) (dbg command-string))))
+    (perform-command (log-message "Socket value" socket) (log-message "Command String" command-string))))
 
 (defn create-controller-server
   [port]

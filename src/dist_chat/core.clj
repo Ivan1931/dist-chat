@@ -24,12 +24,13 @@
   [f & args]
   `(do ~@(map (fn [o] `(~f ~o)) args)))
 
-(defmacro after
-  [message & form]
-  (let [sym (gensym)]
-  `(let [sym ~form]
-     (do (println ~message)
-         sym))))
+(defmacro log-message
+  [message body]
+  `(let [x# ~body]
+     (do (println "[LOG]" (.toString (Date. )) " ==>> " ~message " "))
+         (println x#)
+         x#))
+
 (def message-reciever-port 7070)
 (def contacts (ref {}))
 (def my-alias "Jonah")
