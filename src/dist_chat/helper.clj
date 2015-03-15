@@ -64,3 +64,17 @@
           (do (.close in)
               lines)
           (recur (conj lines line)))))))
+
+(defn echo-dispatch
+  [socket]
+  (let [d (rand)
+        out (BufferedWriter. (writer socket))
+        in  (BufferedReader. (reader socket))]
+    (loop [line (.readLine in)]
+      (if (= line "CLOSE")
+        (do 
+          (println "Client closed connection")
+          (do-repeatedly .close out in socket))
+        (do 
+          (.write out (str "Echo " d " " line "\n"))
+          (.flush out))))))

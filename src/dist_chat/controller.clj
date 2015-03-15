@@ -1,16 +1,15 @@
 (ns dist-chat.core)
 
 ;; This is an impure function, should probably figure out how to fix that
-(defn send-message
-  "Sends a message to the host specified in the message data"
+(defn send-message "Sends a message to the host specified in the message data"
   [address-information]
   (match [address-information]
          [{:host host :port port :message message}]
-         (let [json-message (json/write-str {:date (Date. ) :message message :alias my-alias})
+         (let [json-message (json/write-str {:date (.toString (Date. )) :message message :alias my-alias})
                string (str json-message "\n" :done)
                socket (create-socket host port)]
-           (write-to socket string)
-           (.close socket))
+           (do (write-to socket string)
+               (.close socket)))
          [{:ip address :message message}]
          (send-message {:host address :port message-reciever-port :message message})))
 
@@ -28,20 +27,20 @@
   [[contacts aliases] request]
   (let [search-for-names (fn [names] 
                            {:some (filter-map contacts (partial contains? names))})]
-  (match [request]
-         [{:ips {:all _}}] contacts
-         [{:aliases {:all _}}] contacts
-         [{:ips {:some names}}] (search-for-names @contacts names)
-         ;; Contacts is structure {:ip {:aliases #{aliases} :messages [{:message message} {:date date} {:sender-alias alias}]}}
-         ;;[{:aliases {:some names}}] ()
-         [_] {:error "Bad request"})))
+    (match [request]
+           [{:ips {:all _}}] contacts
+           [{:aliases {:all _}}] contacts
+           [{:ips {:some names}}] (search-for-names @contacts names)
+           ;; Contacts is structure {:ip {:aliases #{aliases} :messages [{:message message} {:date date} {:sender-alias alias}]}}
+           ;;[{:aliases {:some names}}] ()
+           [_] {:error "Bad request"})))
 
 (defn perform-command
   [socket commad-string]
   (let [command (json/read-json commad-string)]
     (match [command]
            [{:send-message data}] 
-           (future (send-message data))
+           (before "Executing message command" future (send-message data))
            [{:request-contacts data}] 
            (let [contact-data (perform-contact-request data)]
              (write-to socket contact-data)))))

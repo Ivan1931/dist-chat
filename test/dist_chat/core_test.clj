@@ -1,8 +1,8 @@
 (ns dist-chat.core-test
   (:require [clojure.tools.trace :refer :all]
+            [clojure.test :refer :all]
             [clojure.data.json :as json]
             [clojure.string :as string]
-            [clojure.test :refer :all]
             [dist-chat.core :refer :all]))
 
 (def msg (promise))
@@ -26,11 +26,6 @@
 ;; So we merely have to pass a function that writes to a promise
 ;; Perhaps we will also want to include a timeout facility so that we can fail the test instead of blocking the main thread
 
-(defmacro before
-  [message & form]
-  `(do (println "Message is: " ~message)
-       ~form))
-
 (defn run-controller-test
   [controller-port setup prom timeout command-resolver & args]
   (do setup
@@ -44,8 +39,8 @@
 
 (defn test-message-reciever-dispatch
   [socket]
-  (let [lines (string/join "\n" (read-lines socket 2))]
-    (do (deliver msg lines)
+  (let [lines (read-lines socket 2)] 
+    (do (deliver msg (json/read-json (first lines)))
         (.close socket))))
 
 (defn send-and-recieve-message
@@ -66,6 +61,6 @@
                   send-msg-test-string)
 
 (deftest dispatch-message-send-test
-  (is (= @msg expected-msg)))
+  (is (= (@msg :message) test-message)))
 
 (run-tests 'dist-chat.core-test)
