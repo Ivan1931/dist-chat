@@ -25,8 +25,7 @@
 (defn perform-contact-request
   "Takes a state hash"
   [[contacts aliases] request]
-  (let [search-for-names (fn [names] 
-                           {:some (filter-map contacts (partial contains? names))})]
+  (let [search-for-names (fn [names] {:some (filter-map contacts (partial contains? names))})]
     (match [request]
            [{:ips {:all _}}] contacts
            [{:aliases {:all _}}] contacts
@@ -40,18 +39,24 @@
   (let [command (json/read-json commad-string)]
     (match [command]
            [{:send-message data}] 
-           (before (str data) future (send-message data))
+           (send-message data)
            [{:request-contacts data}] 
            (let [contact-data (perform-contact-request data)]
              (write-to socket contact-data)))))
 
 (defn controller-dispatch
+  "Dispatch handles commands recieved at the command listening port.
+  Theoretically, the application can only send and recieve requests locally for now. 
+  Currently recognised commands are send-message and request-contact.
+  All calls on this dispatch are blocking calls.  "
   [socket]
   (loop [predicate (fn [line] (= ":done" line))
          command-lines (read-until socket predicate)
-         command-string (before (str "Command lines " command-lines) make-command command-lines)]
-    (perform-command (log-message "Socket value" socket) (log-message "Command String" command-string))))
+         command-string (make-command command-lines)]
+    (perform-command (log-message "Socket value" socket) 
+                     (log-message "Command String" command-string))))
 
 (defn create-controller-server
+  "Creates a controller server listening on specified port"
   [port]
   (create-server port controller-dispatch))

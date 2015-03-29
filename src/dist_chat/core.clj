@@ -27,9 +27,26 @@
 (defmacro log-message
   [message body]
   `(let [x# ~body]
-     (do (println "[LOG]" (.toString (Date. )) " ==>> " ~message " "))
-         (println x#)
+     (do (println "[LOG]" (.toString (Date. )) "|" ~message "-> " x#))
          x#))
+
+(defmacro with-timeout [millis & body]
+  `(let [f# (future ~@body)]
+     (try 
+       (.get f# ~millis java.util.concurrent.TimeUnit/MILLISECONDS)
+       (catch java.util.concurrent.TimeoutException x#
+         (do (future-cancel f#)
+             nil)))))
+
+(defmacro timed-future [timeout & body] 
+  `(let [start# (System/currentTimeMillis)
+         f# (future ~@body)]
+     (loop []
+       (let [elapsed-time# (- (System/currentTimeMillis) start#)]
+         (cond (realized? f#) @f#
+               (< ~timeout elapsed-time#) (do (future-cancel f#)
+                                             :timeout)
+               :else (recur))))))
 
 (def message-reciever-port 7070)
 (def contacts (ref {}))

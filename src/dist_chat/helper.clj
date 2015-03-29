@@ -16,7 +16,11 @@
 (defn create-dispatch
   "Calls ServerSocket.accept and creates a new future which performs statefull io using f"
   [socket f]
-  (->> socket f future))
+  (try 
+    (->> socket f future) 
+    (catch Exception e 
+      (log-message "Exception in dispatch" 
+                   (.getMessage e)))))
 
 (defn create-server
   "Creates a parrelelised server listening to a port.
@@ -46,8 +50,7 @@
       (if (> i 0)
         (recur (dec i) 
                (conj lines (.readLine in)))
-        (do (.close socket)
-            lines)))))
+        lines))))
 
 (defn read-until
   "Reads lines from socket until a line appears that satisfies the predicate.
@@ -61,6 +64,12 @@
           (do (.close in)
               lines)
           (recur (conj lines line)))))))
+
+(defn read-until-done
+  "Reads lines from socket until a line with only \":done\" appears on it"
+  [socket]
+  (let [predicate (fn [line] (= line ":done"))]
+    (read-until socket predicate)))
 
 (defn echo-dispatch
   [socket]
