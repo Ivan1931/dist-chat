@@ -1,59 +1,28 @@
-(ns dist-chat.core-test
-  (:import (java.net Socket)))
+(ns dist-chat.core-test)
 
-;; Controller server can
-;; -> Have resourses requested from it
-;; -> Be asked to do things
-;; We shall test both things seperately
-(defn setup-resource-request-command-test
-  "Sets up a test for a controller command that requests a resource from the controller and then sends that resource back to some other remote host.
-  controller-port is the port number the controller server established by this method shall listen to.
-  resource-reciever-port is the port number of socket to which the command will interact with.
-  resource-reciever-dispatch is a dispatch that handles the socket created during the communication.
-  reciever-promise a promise in which the results of sending data to the reciever dispatch will be sent.
-  command is a string that will be sent to the command server.
-  timeout is the ammount of time the command must ideally be performed."
-  [controller-port 
-   resource-reciever-port 
-   resource-reciever-dispatch
-   command
-   reciever-promise
-   timeout]
+(defn setup-inbox-test
+  [inbox-port controller-port test-message]
   (let [controller-server (future (create-controller-server controller-port))
-        reciever-server (future (create-server resource-reciever-port 
-                                               (partial resource-reciever-dispatch
-                                                        reciever-promise)))
-        socket (Socket. "localhost" controller-port)]
-    (do (write-to socket command)
-        (Thread/sleep timeout)
-        (do-repeatedly future-cancel controller-server reciever-server)
+        inbox-server (future (create-inbox-server inbox-port))
+        socket (create-socket "localhost" controller-port)
+        command {:send-message {:port inbox-port :message test-message :host "localhost"}}
+        message (message-encase (json/write-str command))]
+    (do (write-to socket message)
+        (Thread/sleep 1000)
         (.close socket)
-        (deliver reciever-promise :timeout))))
+        (future-cancel inbox-server)
+        (future-cancel controller-server))))
 
-(defn listen-for-message-delivery
-  [message-promise socket]
-  (let [lines (read-until-done socket)] 
-    (do (deliver message-promise (json/read-json (first lines)))
-        (.close socket))))
-
-(deftest dispatch-message-send-test
-  "Tests the send-message command
-  Sends a correct message and listens for it on another server"
-  (let [controller-port 10001
-        reciever-port 10002
-        message-promise (promise)
-        test-message "Hello"
-        command-message (str (json/write-str {:send-message 
-                                              {:port reciever-port 
-                                               :host "localhost" 
-                                               :message test-message}}) 
-                             "\n" :done)]
-    (do (setup-resource-request-command-test controller-port
-                                             reciever-port
-                                             listen-for-message-delivery
-                                             command-message
-                                             message-promise
-                                             1500)
-        (is (not= @message-promise :timeout))
-        (is (= (@message-promise :message) 
+(deftest inbox-reciept-updates-contacts-test
+  (let [controller-port 7991
+        inbox-port 1997
+        test-message "hello"]
+    (do (setup-inbox-test inbox-port controller-port test-message)
+        (println "Contacts " @contacts)
+        (is (= (get-in @contacts 
+                       ["/127.0.0.1" :messages 0 :alias]) 
+               my-alias ))
+        (is (= (get-in @contacts 
+                       ["/127.0.0.1" :messages 0 :message])
                test-message)))))
+
