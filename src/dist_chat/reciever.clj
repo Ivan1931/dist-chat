@@ -19,18 +19,25 @@
 (def set-conj (comp set conj))
 
 (defn add-message-to-contact
+  "contacts is a contact hash of the form {:ip {:messages [messages] :online boolean :last-seen date :aliases [string] :meta {}}
+  contact will be an ip address
+  returns an updated contacts hash"
   [contacts contact {date :date message :message sender-alias :alias}]
   (update-in contacts 
              [contact :messages] 
-             (fn [messages] (vec-conj {:date date :message message :alias sender-alias}))))
+             (fn [messages] (vec-conj messages {:date date :message message :alias sender-alias}))))
 
 (defn add-alias-to-contact
+  "In the case that our contact is using a different alias to everyone else
+  returns and updated contacts hash with an alias added to a new contact"
   [contacts contact sender-alias]
   (update-in contacts 
              [contact :aliases] 
              (fn [aliases] (set-conj aliases sender-alias))))
 
 (defn handle-message
+  "Updates shared contacts list based on the contents of our new message.
+  Performs a synchronus update of contacts hash"
   [contact {date :date 
             message :message 
             sender-alias :alias}]
@@ -54,6 +61,8 @@
                    sender-alias))))
 
 (defn inbox-dispatch
+  "dispatch handles messages recieved on the inbox
+  message is interpreted and then added to the contacts table if it is correct"
   [socket]
   (let [stop-predicate (fn [line] (= line ":done"))
         raw-message-data (read-until socket stop-predicate)
@@ -64,5 +73,6 @@
                     (log-message "Message-recieved" message-data))))
 
 (defn create-inbox-server
+  "Creates a server that listens on port and handles all messages sent to this chat node"
   [port]
   (create-server port inbox-dispatch))

@@ -18,7 +18,6 @@
         inbox-port 1997
         test-message "hello"]
     (do (setup-inbox-test inbox-port controller-port test-message)
-        (println "Contacts " @contacts)
         (is (= (get-in @contacts 
                        ["/127.0.0.1" :messages 0 :alias]) 
                my-alias ))
