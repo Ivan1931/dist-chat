@@ -6,6 +6,7 @@
 (def message-reciever-port 7070)
 (def contacts (ref {}))
 (def my-alias "Jonah")
+(def message-timeout 1000)
 
 (defn load-contacts
   [contacts-path])

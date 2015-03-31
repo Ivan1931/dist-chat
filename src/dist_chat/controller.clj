@@ -1,17 +1,25 @@
 (ns dist-chat.core)
 
 ;; This is an impure function, should probably figure out how to fix that
-(defn send-message "Sends a message to the host specified in the message data"
+(defn send-message 
+  "Sends a message to the host specified in the message data"
   [address-information]
   (match [address-information]
-         [{:host host :port port :message message}]
-         (let [json-message (json/write-str {:date (.toString (Date. )) :message message :alias my-alias})
-               string (str json-message "\n" :done)
+         [{:host host :port port :message message-text}]
+         (let [message (make-transmission {:date (.toString (Date.)) 
+                                           :message message-text
+                                           :alias my-alias})
                socket (create-socket host port)]
-           (do (write-to socket string)
-               (.close socket)))
-         [{:ip address :message message}]
-         (send-message {:host address :port message-reciever-port :message message})))
+           (do (log-message (str "Sending to " socket)
+                            message)
+               (write-to socket message)
+               (let [response (timed-worker message-timeout
+                                            (read-until-done socket))]
+                 (if (= response :timeout)
+                   :acknowledgement-failure
+                   :success))))
+         [{:ip address :message message-text}]
+         (send-message {:host address :port message-reciever-port :message message-text})))
 
 (defn find-values-for
   [h ks]
@@ -35,6 +43,8 @@
            [_] {:error "Bad request"})))
 
 (defn perform-command
+  "Performs a server command
+  Currently sends messages and requests contacts"
   [socket commad-string]
   (let [command (json/read-json commad-string)]
     (match [command]
@@ -50,9 +60,8 @@
   Currently recognised commands are send-message and request-contact.
   All calls on this dispatch are blocking calls.  "
   [socket]
-  (loop [predicate (fn [line] (= ":done" line))
-         command-lines (read-until socket predicate)
-         command-string (make-command command-lines)]
+  (loop [command-lines (read-until-done socket)
+         command-string (format-command command-lines)]
     (do (perform-command (log-message "Socket value" socket) 
                          (log-message "Command String" command-string))
         (.close socket))))

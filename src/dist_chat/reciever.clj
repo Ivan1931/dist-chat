@@ -46,25 +46,31 @@
         final-message {:date formatted-date
                        :message message-text
                        :alias sender-alias}]
-    (dosync (try 
-              (do
-                (alter contacts 
-                       add-message-to-contact
-                       contact
-                       final-message)
-                (alter contacts 
-                       add-alias-to-contact
-                       contact
-                       sender-alias)
-                [:success])
-              (catch Exception e [:error (.getStackTrace e)])))))
+    (dosync 
+      (do
+        (alter contacts 
+               add-message-to-contact
+               contact
+               final-message)
+        (alter contacts 
+               add-alias-to-contact
+               contact
+               sender-alias)
+        [:success]))))
+
+(with-handler! (var handle-message)
+  "Handler for now just deals all exceptions. Returns an error status with an exception"
+  java.lang.Exception
+  (fn [e & args] [:error e (.getStackTrace e)]))
 
 (defn inbox-dispatch
   "dispatch handles messages recieved on the inbox
-  message is interpreted and then added to the contacts table if it is correct"
+  message is interpreted and then added to the contacts table if it is correct
+  If all goes according to plan, we respond to the listening socket with a :success tag.
+  If the sender does not recieve a success tag, it will assume that the message was not successfully sent"
   [socket]
   (let [raw-message-data (read-until-done socket)
-        message (make-command raw-message-data)
+        message (format-command raw-message-data)
         contact (->> socket .getInetAddress .toString)
         message-data (json/read-json message)]
     (match (handle-message (log-message "Message recieved from " contact)
@@ -72,8 +78,32 @@
            [:error message] (do (log-message "Error while recieving message"
                                              message)
                                 (write-to socket ((comp message-encase json/write-str) [:internal-error])))
-           [:succes] (.close socket))))
+           [:success] (do (write-to socket (make-transmission :success))
+                          (.close socket)))))
 
+(with-handler! (var inbox-dispatch)
+  "Catch a possible json error"
+  java.lang.Exception
+  (fn [e socket] (do (log-message "Possible json-parse error"
+                                  (.getStackTrace e))
+                     (write-to socket (make-transmission :json-parse-error))
+                     (.close socket))))
+
+(with-handler! (var inbox-dispatch)
+  "Catch errors when reading from socket"
+  java.io.IOException
+  (fn [e socket] (do (log-message "IO error when recieving message"
+                                  (.getStackTrace e))
+                     (.close socket))))
+
+(with-handler! (var inbox-dispatch)
+  "What to do when some of the required fields for a message are not transmitted. 
+  This will set off a null pointer error"
+  java.lang.NullPointerException
+  (fn [e socket] (do (log-message "Possibly incorrect fields in message"
+                                  (.getStackTrace e))
+                     (write-to socket (make-transmission :unrecognised-command-fields))
+                     (.close socket))))
 
 (defn create-inbox-server
   "Creates a server that listens on port and handles all messages sent to this chat node"

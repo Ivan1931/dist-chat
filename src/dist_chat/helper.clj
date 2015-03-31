@@ -89,6 +89,16 @@
   [message]
   (str message "\n" :done))
 
-(defn make-command
+(defn format-command
+  "Combines commands together using \n. Removes any line that say :done"
   [command-lines]
-  (string/join "\n" command-lines))
+  (->> command-lines
+       (filter #(not= ":done" %))
+       (string/join "\n")))
+
+(defn make-transmission
+  "Takes a message hash and converts it into a readable string"
+  [message]
+  (str (json/write-str message)
+       "\n"
+       :done))
