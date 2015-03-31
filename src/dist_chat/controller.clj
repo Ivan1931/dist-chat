@@ -53,8 +53,9 @@
   (loop [predicate (fn [line] (= ":done" line))
          command-lines (read-until socket predicate)
          command-string (make-command command-lines)]
-    (perform-command (log-message "Socket value" socket) 
-                     (log-message "Command String" command-string))))
+    (do (perform-command (log-message "Socket value" socket) 
+                         (log-message "Command String" command-string))
+        (.close socket))))
 
 (defn create-controller-server
   "Creates a controller server listening on specified port"
