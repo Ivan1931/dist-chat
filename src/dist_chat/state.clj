@@ -7,6 +7,7 @@
 (def contacts (ref {}))
 (def my-alias "Jonah")
 (def message-timeout 1000)
+(def logging true)
 
 (defn load-contacts
   [contacts-path])

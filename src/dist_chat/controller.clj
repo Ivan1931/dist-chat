@@ -10,14 +10,14 @@
                                            :message message-text
                                            :alias my-alias})
                socket (create-socket host port)]
-           (do (log-message (str "Sending to " socket)
+           (do (log-info (str "Sending to " socket)
                             message)
                (write-to socket message)
                (let [response (timed-worker message-timeout
                                             (read-until-done socket))]
-                 (if (= response :timeout)
-                   :acknowledgement-failure
-                   :success))))
+                 (if (not= response ":success")
+                   :command-failure
+                   :command-success))))
          [{:ip address :message message-text}]
          (send-message {:host address :port message-reciever-port :message message-text})))
 
@@ -49,7 +49,9 @@
   (let [command (json/read-json commad-string)]
     (match [command]
            [{:send-message data}] 
-           (send-message data)
+           (let [result (send-message data)]
+             (do (write-to socket 
+                           (make-transmission result))))
            [{:request-contacts data}] 
            (let [contact-data (perform-contact-request data)]
              (write-to socket contact-data)))))
@@ -62,8 +64,8 @@
   [socket]
   (loop [command-lines (read-until-done socket)
          command-string (format-command command-lines)]
-    (do (perform-command (log-message "Socket value" socket) 
-                         (log-message "Command String" command-string))
+    (do (perform-command (log-info "Socket value" socket) 
+                         (log-info "Command String" command-string))
         (.close socket))))
 
 (defn create-controller-server

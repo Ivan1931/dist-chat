@@ -19,8 +19,8 @@
   (try 
     (->> socket f future) 
     (catch Exception e 
-      (log-message "Exception in dispatch" 
-                   (.getMessage e)))))
+      (log-info "Exception in dispatch" 
+                (.getMessage e)))))
 
 (defn create-server
   "Creates a parrelelised server listening to a port.
@@ -32,14 +32,16 @@
       (let [socket (.accept server)]
         (create-dispatch socket dispatch)))))
 
-
 (defn write-to
   "Writes the specified string to the socket"
   [socket string]
   (let [out (BufferedWriter. (writer socket))]
-    (do (.write out string)
-        (.flush out)
-        (.close out))))
+    (do 
+      ;;This is a fix because for some reason buffered writer was not writing entire lines during writes
+      (doseq [lines (string/split string #"\n|\r\n")]
+        (do (.write out string)
+            (.newLine out))
+      (.flush out)))))
 
 (defn read-lines
   "Reads n lines from a socket. Blocks until n lines are provided"
@@ -61,8 +63,7 @@
     (loop [lines []]
       (let [line (.readLine in)]
         (if (predicate line)
-          (do (.close in)
-              lines)
+          lines
           (recur (conj lines line)))))))
 
 (defn read-until-done
@@ -87,18 +88,18 @@
 
 (defn message-encase
   [message]
-  (str message "\n" :done))
+  (str message 
+       \newline
+       :done))
 
 (defn format-command
   "Combines commands together using \n. Removes any line that say :done"
   [command-lines]
-  (->> command-lines
-       (filter #(not= ":done" %))
-       (string/join "\n")))
+  (string/join "\n" 
+               (filter (fn [line] (not= ":done" line)) 
+                       command-lines)))
 
 (defn make-transmission
-  "Takes a message hash and converts it into a readable string"
+  "Takes a hash and converts it into a sendable command"
   [message]
-  (str (json/write-str message)
-       "\n"
-       :done))
+  (message-encase (json/write-str message)))

@@ -63,6 +63,13 @@
   java.lang.Exception
   (fn [e & args] [:error e (.getStackTrace e)]))
 
+(defn parse-json-or-nil
+  "Tries to read json, if that fails return null"
+  [string]
+  (try 
+    (json/read-json string)
+    (catch Exception e nil)))
+
 (defn inbox-dispatch
   "dispatch handles messages recieved on the inbox
   message is interpreted and then added to the contacts table if it is correct
@@ -73,36 +80,34 @@
         message (format-command raw-message-data)
         contact (->> socket .getInetAddress .toString)
         message-data (json/read-json message)]
-    (match (handle-message (log-message "Message recieved from " contact)
-                           (log-message "Message-recieved" message-data))
-           [:error message] (do (log-message "Error while recieving message"
-                                             message)
-                                (write-to socket ((comp message-encase json/write-str) [:internal-error])))
+    (match (handle-message (log-info "Message recieved from " contact)
+                           (log-info "Message-recieved" message-data))
+           [:error message] (do (log-error "Error while recieving message"
+                                           message)
+                                (write-to socket (make-transmission :internal-error))
+                                (.close socket))
            [:success] (do (write-to socket (make-transmission :success))
                           (.close socket)))))
 
 (with-handler! (var inbox-dispatch)
   "Catch a possible json error"
   java.lang.Exception
-  (fn [e socket] (do (log-message "Possible json-parse error"
-                                  (.getStackTrace e))
+  (fn [e socket] (do (log-exception "Possible json-parse error" e)
                      (write-to socket (make-transmission :json-parse-error))
                      (.close socket))))
 
 (with-handler! (var inbox-dispatch)
   "Catch errors when reading from socket"
   java.io.IOException
-  (fn [e socket] (do (log-message "IO error when recieving message"
-                                  (.getStackTrace e))
+  (fn [e socket] (do (log-exception "IO error when recieving message" e)
                      (.close socket))))
 
 (with-handler! (var inbox-dispatch)
   "What to do when some of the required fields for a message are not transmitted. 
   This will set off a null pointer error"
   java.lang.NullPointerException
-  (fn [e socket] (do (log-message "Possibly incorrect fields in message"
-                                  (.getStackTrace e))
-                     (write-to socket (make-transmission :unrecognised-command-fields))
+  (fn [e socket] (do (log-exception "Possibly incorrect fields in message" e)
+                     (write-to socket (make-transmission :unrecognised-message-fields))
                      (.close socket))))
 
 (defn create-inbox-server

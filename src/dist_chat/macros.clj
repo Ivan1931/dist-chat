@@ -10,6 +10,11 @@
      (println "dbg:" '~body "=" x#)
      x#))
 
+(defn dbg-message
+  "Prints a debug message to stdout"
+  [message]
+  (println "[DEBUG]" message))
+
 (defmacro do-repeatedly
   [f & args]
   `(do ~@(map (fn [o] `(~f ~o)) args)))
@@ -20,20 +25,34 @@
   `(let [v# ~v]
      (do (println "[LOG]" (.toString (Date.)) "|" v "-> " v#))))
 
-(defmacro log-message
+(defmacro log
   "Evaluates and returns a body. Logs result of the evaluation. Also prints a message with that"
-  [message body]
-  `(let [x# ~body]
-     (do (println "[LOG]" (.toString (Date. )) "|" ~message "-> " x#))
-     x#))
+  [output-type message body]
+    `(let [x# ~body]
+       (do (println "[" ~output-type "]" (.toString (Date. )) "|" ~message "-> " x#))
+       x#))
 
-(defmacro with-timeout [millis & body]
-  `(let [f# (future ~@body)]
-     (try 
-       (.get f# ~millis java.util.concurrent.TimeUnit/MILLISECONDS)
-       (catch java.util.concurrent.TimeoutException x#
-         (do (future-cancel f#)
-             nil)))))
+(defmacro log-info
+  [message body]
+  `(log "INFO" ~message ~body))
+
+(defmacro log-error
+  [message body]
+  `(log "ERROR" ~message ~body))
+
+(defn- exception-to-str
+  "e is an Exception
+  returns the stack trace of e as a string. Stack trace is combined with lines"
+  [e]
+  (->> (.getStackTrace e)
+       (map str)
+       (string/join \newline)
+       (str \newline)))
+
+(defmacro log-exception
+  [message e]
+  `(log-error ~message
+              (exception-to-str ~e)))
 
 (defmacro timed-worker [timeout & body] 
   `(let [start# (System/currentTimeMillis)
