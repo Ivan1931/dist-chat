@@ -65,6 +65,12 @@
              (write-to socket 
                        (make-transmission user-status))))))
 
+(with-handler! (var perform-command)
+  "If we have an unregonised command sent to the server, log it"
+  java.lang.NullPointerException
+  (fn [e & args]
+    (log-exception "Unsupported command" e)))
+
 (defn controller-dispatch
   "Dispatch handles commands recieved at the command listening port.
   Theoretically, the application can only send and recieve requests locally for now. 
