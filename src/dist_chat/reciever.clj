@@ -89,6 +89,7 @@
            [:success] (do (write-to socket (make-transmission :success))
                           (.close socket)))))
 
+;;Error handlers for inbox server
 (with-handler! (var inbox-dispatch)
   "Catch a possible json error"
   java.lang.Exception

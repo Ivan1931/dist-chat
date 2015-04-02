@@ -57,3 +57,28 @@
         (is (not= @message-promise :timeout))
         (is (= (@message-promise :message) 
                test-message)))))
+
+(deftest check-online-test
+  "Tests whether the check online command works for both online and offline users"
+  (let [controller-port 7000
+        echo-port 8000
+        fail-port 8001
+        controller-server (future (create-controller-server controller-port))
+        echo-server (future (create-server echo-port echo-dispatch))
+        alive-server-command {:check-online {:host "localhost" :port echo-port}}
+        dead-server-command {:check-online {:host "localhost" :port fail-port}}
+        online-socket (create-socket "localhost" controller-port)
+        dead-socket (create-socket "localhost" controller-port)]
+    (do (write-to online-socket 
+                  (make-transmission alive-server-command))
+        (let [response (read-until-done online-socket)]
+          (is (= (parse-server-response response) 
+                 {:user "localhost" :online true})))
+        (write-to dead-socket
+                  (make-transmission dead-server-command))
+        (let [response (read-until-done dead-socket)]
+          (is (= (parse-server-response response)
+                 {:user "localhost" :online false})))
+        (future-cancel echo-server)
+        (future-cancel controller-server))))
+                  

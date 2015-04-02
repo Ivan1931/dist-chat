@@ -30,7 +30,7 @@
 (deftest incorrectly-formatted-message-test
   "Tests sending an incorrectly formatted message"
   (let [inbox-port 4444
-        ill-formatted-message (dbg (message-encase "this is completely incorrect json"))
+        ill-formatted-message (message-encase "this is completely incorrect json")
         inbox-server (future (create-inbox-server inbox-port))
         socket (create-socket "localhost" inbox-port)]
     (do (write-to socket ill-formatted-message)

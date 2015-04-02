@@ -86,6 +86,14 @@
           (.write out (str "Echo " d " " line "\n"))
           (.flush out))))))
 
+(defn server-listening?
+  "Tests if a server is listening at specified host and port by creating a socket"
+  [host port]
+  (try (let [socket (create-socket host port)]
+         (do (.close socket)
+             true))
+       (catch java.net.ConnectException e false)))
+
 (defn message-encase
   [message]
   (str message 
@@ -103,3 +111,7 @@
   "Takes a hash and converts it into a sendable command"
   [message]
   (message-encase (json/write-str message)))
+
+(defn parse-server-response
+  [command-lines]
+  (json/read-json (format-command command-lines)))

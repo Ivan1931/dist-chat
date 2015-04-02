@@ -5,6 +5,7 @@
             [clojure.string :as string]
             [dist-chat.core :refer :all]))
 
+(load "helper_test")
 (load "state_accessors_test")
 (load "controller_test")
 (load "reciever_test")

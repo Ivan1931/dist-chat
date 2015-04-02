@@ -42,6 +42,11 @@
            ;;[{:aliases {:some names}}] ()
            [_] {:error "Bad request"})))
 
+(defn perform-online-check
+  [{host :host port :port}]
+  {:online (server-listening? host port)
+   :user host})
+
 (defn perform-command
   "Performs a server command
   Currently sends messages and requests contacts"
@@ -54,7 +59,11 @@
                            (make-transmission result))))
            [{:request-contacts data}] 
            (let [contact-data (perform-contact-request data)]
-             (write-to socket contact-data)))))
+             (write-to socket contact-data))
+           [{:check-online data}]
+           (let [user-status (perform-online-check data)]
+             (write-to socket 
+                       (make-transmission user-status))))))
 
 (defn controller-dispatch
   "Dispatch handles commands recieved at the command listening port.
