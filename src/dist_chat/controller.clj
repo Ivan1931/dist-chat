@@ -67,38 +67,37 @@
              (write-to socket contact-data))
            [{:check-online data}]
            (let [user-status (perform-online-check data)]
-             (do (println user-status)
-                 (write-to socket 
-                           (make-transmission user-status)))))))
+             (write-to socket 
+                       (make-transmission user-status))))))
 
-  (with-handler! (var perform-command)
-    "If we have an unregonised command sent to the server, log it"
-    java.lang.NullPointerException
-    (fn [e & args]
-      (log-exception "Unsupported command" e)))
+(with-handler! (var perform-command)
+  "If we have an unregonised command sent to the server, log it"
+  java.lang.NullPointerException
+  (fn [e & args]
+    (log-exception "Unsupported command" e)))
 
-  (defn controller-dispatch
-    "Dispatch handles commands recieved at the command listening port.
-    Theoretically, the application can only send and recieve requests locally for now. 
-    Currently recognised commands are send-message and request-contact.
-    All calls on this dispatch are blocking calls.  "
-    [socket]
-    (loop [command-lines (read-until-done socket)
-           command-string (format-command command-lines)]
-      (do (perform-command (log-info "Socket value" socket) 
-                           (log-info "Command String" command-string))
-          (.close socket))))
+(defn controller-dispatch
+  "Dispatch handles commands recieved at the command listening port.
+  Theoretically, the application can only send and recieve requests locally for now. 
+  Currently recognised commands are send-message and request-contact.
+  All calls on this dispatch are blocking calls.  "
+  [socket]
+  (loop [command-lines (read-until-done socket)
+         command-string (format-command command-lines)]
+    (do (perform-command (log-info "Socket value" socket) 
+                         (log-info "Command String" command-string))
+        (.close socket))))
 
-  (defn controller-timeout-handler
-    [socket]
-    (do (log-error "Timeout while processing socket" socket)
-        (write-to socket 
-                  (make-transmission :timeout))))
+(defn controller-timeout-handler
+  [socket]
+  (do (log-error "Timeout while processing socket" socket)
+      (write-to socket 
+                (make-transmission :timeout))))
 
-  (defn create-controller-server
-    "Creates a controller server listening on specified port"
-    [port]
-    (create-timed-server port 
-                         controller-dispatch
-                         controller-timeout
-                         controller-timeout-handler))
+(defn create-controller-server
+  "Creates a controller server listening on specified port"
+  [port]
+  (create-timed-server port 
+                       controller-dispatch
+                       controller-timeout
+                       controller-timeout-handler))

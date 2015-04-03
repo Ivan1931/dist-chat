@@ -40,7 +40,6 @@
   [socket dispatch timeout timeout-handler]
   (let [worker (->> socket dispatch (timed-worker timeout))]
     (when (= worker :timeout)
-      (println "Timeout")
       (timeout-handler socket)
       (.close socket))))
 
