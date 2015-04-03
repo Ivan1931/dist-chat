@@ -32,6 +32,40 @@
       (let [socket (.accept server)]
         (create-dispatch socket dispatch)))))
 
+(defn create-timed-dispatch
+  "Creates a dispatch that will create a worker to handle a socket with dispatch
+  and allow it to run for timeout milliseconds. If the dispatch times out, the handler function will pass
+  onto the timeout handler with will do something with the socket. 
+  Also will cancell the worker and close the socket if timeout occurs"
+  [socket dispatch timeout timeout-handler]
+  (let [worker (->> socket dispatch (timed-worker timeout))]
+    (when (= worker :timeout)
+      (println "Timeout")
+      (timeout-handler socket)
+      (.close socket))))
+
+(with-handler! (var create-timed-dispatch)
+  "Log and handle any errors that may occur during a timed dispatch"
+  java.lang.Exception
+  (fn [e & args] (log-exception "Error whilst performing timed dispatch" e)))
+
+(defn create-timed-server
+  "Creates a dispatch server which will accept and interact with a socket connection for a specified ammount of time
+  before passing the socket created to another function that handles timeouts.
+  port is the port the server will listen too.
+  dispatch is the function used to handle sockets created using (.accept server).
+  timeout is the time in milliseconds allotted to a command for it to succeed.
+  timeout-handler is a function that takes a socket as an argument and is called if the dispatch is timed out."
+  [port dispatch timeout timeout-handler]
+  (let [server (create-server-socket port)]
+    (while true
+      (let [socket (.accept server)]
+        (future 
+          (create-timed-dispatch socket 
+                                 dispatch 
+                                 timeout 
+                                 timeout-handler))))))
+
 (defn write-to
   "Writes the specified string to the socket"
   [socket string]
@@ -41,7 +75,7 @@
       (doseq [lines (string/split string #"\n|\r\n")]
         (do (.write out string)
             (.newLine out))
-      (.flush out)))))
+        (.flush out)))))
 
 (defn read-lines
   "Reads n lines from a socket. Blocks until n lines are provided"

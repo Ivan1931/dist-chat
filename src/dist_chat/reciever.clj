@@ -111,7 +111,17 @@
                      (write-to socket (make-transmission :unrecognised-message-fields))
                      (.close socket))))
 
+(defn inbox-timeout-handler
+  "Handles timeout if inbox takes too long to occur"
+  [socket]
+  (do (log-error "Timeout while processing message send from socket" socket)
+      (write-to socket 
+                (make-transmission :timeout))))
+
 (defn create-inbox-server
   "Creates a server that listens on port and handles all messages sent to this chat node"
   [port]
-  (create-server port inbox-dispatch))
+  (create-timed-server port
+                       inbox-dispatch
+                       inbox-timeout
+                       inbox-timeout-handler))

@@ -1,10 +1,7 @@
 (ns dist-chat.core-test
   (:import (java.net Socket)))
 
-;; Controller server can
-;; -> Have resourses requested from it
-;; -> Be asked to do things
-;; We shall test both things seperately
+;; Controller server can ;; -> Have resourses requested from it ;; -> Be asked to do things ;; We shall test both things seperately
 (defn setup-resource-request-command-test
   "Sets up a test for a controller command that requests a resource from the controller and then sends that resource back to some other remote host.
   controller-port is the port number the controller server established by this method shall listen to.

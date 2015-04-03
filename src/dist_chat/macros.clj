@@ -47,7 +47,7 @@
   (->> (.getStackTrace e)
        (map str)
        (string/join \newline)
-       (str \newline)))
+       (str "Message " (.getMessage e) \newline)))
 
 (defmacro log-exception
   [message e]
