@@ -1,5 +1,6 @@
 (ns dist-chat.core
-  (:require [dire.core :refer [with-handler!]]
+  (:require [seesaw.core :refer :all]
+            [dire.core :refer [with-handler!]]
             [clojure.core.match :refer [match]]
             [clojure.data.json :as json :refer [read-json write-str read-str]]
             [clojure.string :as string refer [join]]
@@ -12,3 +13,14 @@
 (load "reciever")
 (load "sender")
 (load "controller")
+
+(defn -main
+  [& args]
+  (invoke-later
+    (-> (frame :title "Hello",
+               :content "Hello seesaw",
+               :on-close :exit)
+        pack!
+        show!)))
+
+
