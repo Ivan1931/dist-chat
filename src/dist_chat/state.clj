@@ -3,7 +3,6 @@
 ;; Contacts will store a hash of the following form
 ;; {:ip {:messages [messages] :online boolean :last-seen date :aliases [string] :meta {}}
 
-(def message-reciever-port 7070)
 (def inbox-port 13616)
 (def inbox-timeout 10000)
 (def controller-timeout 10000)

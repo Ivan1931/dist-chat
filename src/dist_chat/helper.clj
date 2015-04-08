@@ -140,6 +140,16 @@
                (filter (fn [line] (not= ":done" line)) 
                        command-lines)))
 
+(defn surround
+  "Calls str on s and surrounds the result with d"
+  [s d]
+  (str d s d))
+
+(defn quoterise
+  "Surrounds string representation of s with \""
+  [s]
+  (surround s \"))
+
 (defn make-transmission
   "Takes a hash and converts it into a sendable command"
   [message]
@@ -148,3 +158,8 @@
 (defn parse-server-response
   [command-lines]
   (json/read-json (format-command command-lines)))
+
+(defn strip-forward-slashes
+  "Gets rid of forward slashes in string"
+  [s]
+  (string/replace s "/" ""))

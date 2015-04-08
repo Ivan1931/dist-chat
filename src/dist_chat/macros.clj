@@ -5,6 +5,14 @@
   `(do (println (quote ~message) " ->\n" ~message "\n")
        ~form))
 
+(defmacro flip
+  "Flip takes the body of a function defined with all its arguments but the first one
+  and returns a curried function that takes only one argument which is the first
+  Example
+  (flip string/join \" \") -> (fn [coll] (string/join coll \" \"))"
+  [func & body]
+  `(fn [arg#] (~func arg# ~@body)))
+
 (defmacro dbg [body]
   `(let [x# ~body]
      (println "dbg:" '~body "=" x#)

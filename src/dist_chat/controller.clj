@@ -15,11 +15,21 @@
                (write-to socket message)
                (let [response (timed-worker message-timeout
                                             (read-until-done socket))]
-                 (if (not= response ":success")
-                   :command-failure
-                   :command-success))))
+                 (if (not= response
+                           [(quoterise "success")])
+                   (log-error "Some thing went wrong when sending message" :command-failure)
+                   (dosync 
+                     (try (alter contacts add-message-to-contact
+                                           host
+                                           {:date (Date.)
+                                            :alias my-alias
+                                            :message message-text
+                                            :reply true})
+                                (catch Exception e (log-exception "Error when writing the message we sent to contacts" e)))
+                           (log-info "Succesfully sent and processed message" :command-success)
+                           :command-success)))))
          [{:ip address :message message-text}]
-         (send-message {:host address :port message-reciever-port :message message-text})))
+         (send-message {:host address :port inbox-port :message message-text})))
 
 (defn find-values-for
   [h ks]

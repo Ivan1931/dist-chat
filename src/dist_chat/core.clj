@@ -1,6 +1,5 @@
 (ns dist-chat.core
-  (:require [seesaw.core :refer :all]
-            [dire.core :refer [with-handler!]]
+  (:require [dire.core :refer [with-handler!]]
             [clojure.core.match :refer [match]]
             [clojure.data.json :as json :refer [read-json write-str read-str]]
             [clojure.string :as string refer [join]]
@@ -16,11 +15,4 @@
 
 (defn -main
   [& args]
-  (invoke-later
-    (-> (frame :title "Hello",
-               :content "Hello seesaw",
-               :on-close :exit)
-        pack!
-        show!)))
-
-
+  (do (create-inbox-server inbox-port)))

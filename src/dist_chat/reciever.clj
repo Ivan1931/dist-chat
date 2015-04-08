@@ -22,10 +22,13 @@
   "contacts is a contact hash of the form {:ip {:messages [messages] :online boolean :last-seen date :aliases [string] :meta {}}
   contact will be an ip address
   returns an updated contacts hash"
-  [contacts contact {date :date message :message sender-alias :alias}]
+  [contacts contact {date :date message :message sender-alias :alias is-reply :reply}]
   (update-in contacts 
              [contact :messages] 
-             (fn [messages] (vec-conj messages {:date date :message message :alias sender-alias}))))
+             (fn [messages] (vec-conj messages {:date date 
+                                                :message message 
+                                                :alias sender-alias 
+                                                :reply is-reply}))))
 
 (defn add-alias-to-contact
   "In the case that our contact is using a different alias to everyone else
@@ -78,7 +81,7 @@
   [socket]
   (let [raw-message-data (read-until-done socket)
         message (format-command raw-message-data)
-        contact (->> socket .getInetAddress .toString)
+        contact (->> socket .getInetAddress .toString strip-forward-slashes)
         message-data (json/read-json message)]
     (match (handle-message (log-info "Message recieved from " contact)
                            (log-info "Message-recieved" message-data))
@@ -86,7 +89,8 @@
                                            message)
                                 (write-to socket (make-transmission :internal-error))
                                 (.close socket))
-           [:success] (do (write-to socket (make-transmission :success))
+           [:success] (do (log-info "Succesfully processed message, sending reply" :success)
+                          (write-to socket (make-transmission :success))
                           (.close socket)))))
 
 ;;Error handlers for inbox server
