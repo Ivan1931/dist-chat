@@ -1,7 +1,8 @@
 (ns dist-chat.core
   (:require [seesaw.core :refer :all]
             [seesaw.mig :refer [mig-panel]]
-            [seesaw.dev :refer [show-options]]))
+            [seesaw.dev :refer [show-options]]
+            [seesaw.bind :as b]))
 
 
 ;; Figure out how to embed panels
@@ -11,6 +12,7 @@
 ;; Add text area for sending messages
 ;; Figure out how we are going to change between different contacts in gui
 ;; {:ip {:messages [messages] :online boolean :last-seen date :aliases [string] :meta {}}
+
 
 (def test-data {"/127.0.0.1" {:messages [{:date (Date.) :message "Hello there man" :alias "John" :reply false} 
                                          {:date (Date.) :message "Hello there man" :alias "John" :reply false} 
@@ -42,12 +44,24 @@
        (map message-to-str)
        (string/join \newline)))
 
+(def save-action
+  (menu-item :text "Save" 
+             :listen [:action (fn [e] 
+                                (println "I'm a saver"))]))
+
+(def exit-action
+  (menu-item :text "Exit"
+             :listen [:action (fn [e]
+                                (println "I'm an exiter"))]))
+
 (def main-view
   (-> (frame :title "dist-chat"
              :content "Hello there"
              :size [680 :by 400]
-             :on-close :exit)
-      pack!
+             :on-close :exit
+             :menubar 
+                (menubar :items 
+                  [(menu :text "File" :items [save-action exit-action])]))
       show!))
 
 (defn display
@@ -65,6 +79,7 @@
 (defn render-contact
   [renderer data]
   (let [{:keys [value selected?]} data
+        host-address (value 0)
         aliases (get-in value [1 :aliases])
         alias-string (if aliases 
                        (string/join "/" aliases)
@@ -72,8 +87,30 @@
     (config! renderer :text alias-string)))
 
 (def contacts-list-box
-  (listbox :model (vec test-data)
-           :renderer render-contact))
+  (listbox 
+    :model @contacts
+    :renderer (reify javax.swing.ListCellRenderer
+                (getListCellRendererComponent
+                  [this component value idx isSelected cellHasFocus]
+                  (let [host-address (value 0)
+                        aliases (get-in value [1 :aliases])
+                        alias-string (if aliases 
+                                       (string/join "/" aliases)
+                                       (value 0))
+                        background-color (if (even? idx)
+                                           (seesaw.color/color 210 240 220)
+                                           (seesaw.color/color 210 220 240))]
+                    (label :text alias-string
+                           :background (if isSelected
+                                         (seesaw.color/color 230 210 210)
+                                         background-color)))))))
+
+(add-watch contacts :gui-update
+           (fn [key ref old-state new-state]
+             (let [last-selected (.getSelectedIndex contacts-list-box)]
+               (do 
+                 (config! contacts-list-box :model new-state)
+                 (.setSelectedIndex contacts-list-box last-selected)))))
 
 (defn add-contact-handler
   "Adds a new contact to our contacts hash"
@@ -82,9 +119,9 @@
         new-contact-alias (input "Enter an alias for contact")]
     (if (and new-contact new-contact-alias)
       (dosync (alter contacts add-alias-to-contact 
-                              new-contact 
-                              new-contact-alias))
-        nil)))
+                     new-contact 
+                     new-contact-alias))
+      nil)))
 
 (def add-contact-button
   (button :text "Add Contact"
@@ -118,11 +155,11 @@
         message-hash {:ip host
                       :message message-content}]
     (future 
-       (do (log-info "Sending message from GUI" message-hash)
-           (try (let [send-result (send-message message-hash)]
-                  (println "Finished" send-result))
-                    (catch Exception e
-                    (log-exception "Error sending message from GUI" e)))))))
+      (do (log-info "Sending message from GUI" message-hash)
+          (try (let [send-result (send-message message-hash)]
+                   (text! message-field ""))
+               (catch Exception e
+                 (log-exception "Error sending message from GUI" e)))))))
 
 (defn message-input
   [contact]
@@ -137,23 +174,20 @@
                     (message-input contact)
                     :divider-location 8/9))
 
+
 (def main-split
-    (left-right-split contacts-display-area
-                      (chat-interface (selection contacts-list-box))))
+  (left-right-split contacts-display-area
+                    (chat-interface (.elementAt (config contacts-list-box :model) 0))))
 
 (defn update-chat-interface
   [contact]
   (.setRightComponent main-split
                       (chat-interface contact)))
+
+(.setSelectedIndex contacts-list-box 0)
+
 (listen contacts-list-box :selection
         (fn [e]
           (update-chat-interface (value e))))
 
 (display-main main-split)
-;; We need to update the state of the ui when ever we recieve a new message
-(add-watch contacts :update-gui
-           (fn [-ref -key old new]
-             (let [current-selection (selection contacts-list-box)]
-                  (do (config! contacts-list-box 
-                               :model (vec new))
-                      (selection! contacts-list-box current-selection)))))
