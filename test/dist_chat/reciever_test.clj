@@ -22,7 +22,7 @@
     (do (setup-send-message-test inbox-port controller-port test-message)
         (is (= (get-in @contacts 
                        ["/127.0.0.1" :messages 0 :alias]) 
-               my-alias ))
+               @my-alias))
         (is (= (get-in @contacts 
                        ["/127.0.0.1" :messages 0 :message])
                test-message)))))

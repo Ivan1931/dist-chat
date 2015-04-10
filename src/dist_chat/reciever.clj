@@ -73,6 +73,19 @@
     (json/read-json string)
     (catch Exception e nil)))
 
+(defn handle-online-check
+  [socket]
+  (timed-worker 
+    message-timeout
+    (write-to socket (make-transmission :yes))))
+
+(with-handler! (var handle-online-check)
+  "Catch possible socket erros, json erros, ect"
+  (fn [e socket]
+    (do (log-exception "Error whilst processing online-request" e)
+        (when (-> socket .isClosed not)
+          (.close socket)))))
+
 (defn inbox-dispatch
   "dispatch handles messages recieved on the inbox
   message is interpreted and then added to the contacts table if it is correct
@@ -83,15 +96,23 @@
         message (format-command raw-message-data)
         contact (->> socket .getInetAddress .toString strip-forward-slashes)
         message-data (json/read-json message)]
-    (match (handle-message (log-info "Message recieved from " contact)
-                           (log-info "Message-recieved" message-data))
-           [:error message] (do (log-error "Error while recieving message"
-                                           message)
-                                (write-to socket (make-transmission :internal-error))
-                                (.close socket))
-           [:success] (do (log-info "Succesfully processed message, sending reply" :success)
-                          (write-to socket (make-transmission :success))
-                          (.close socket)))))
+    (if (= message-data 
+           "online?")
+      (let [result (handle-online-check (log-info "Recieved online check from" socket))]
+        (do (if (= result :timeout)
+                (log-error "Timeout while processing online request"
+                           :timeout)
+                (log-info "Succesfully processed online request to contact" contact))
+                (.close socket)))
+      (match (handle-message (log-info "Message recieved from " contact)
+                             (log-info "Message-recieved" message-data))
+             [:error message] (do (log-error "Error while recieving message"
+                                             message)
+                                  (write-to socket (make-transmission :internal-error))
+                                  (.close socket))
+             [:success] (do (log-info "Succesfully processed message, sending reply" :success)
+                            (write-to socket (make-transmission :success))
+                            (.close socket))))))
 
 ;;Error handlers for inbox server
 (with-handler! (var inbox-dispatch)

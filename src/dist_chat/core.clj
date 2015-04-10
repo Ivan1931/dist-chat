@@ -12,7 +12,9 @@
 (load "reciever")
 (load "sender")
 (load "controller")
+(load "ui")
 
 (defn -main
   [& args]
-  (do (create-inbox-server inbox-port)))
+  (do (future 
+        (create-inbox-server inbox-port))))

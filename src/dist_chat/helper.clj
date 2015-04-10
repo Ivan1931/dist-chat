@@ -163,3 +163,17 @@
   "Gets rid of forward slashes in string"
   [s]
   (string/replace s "/" ""))
+
+(defn is-online?
+  "Check online is a simple check to see if a message server is up and running on the other end.
+  If anything goes wrong during the transmission that triggers and exception, it will return false. Otherwise true"
+  [host port]
+  (try 
+    (let [socket (create-socket host port)]
+      (do
+        (write-to socket (make-transmission :online?))
+        (let [response (read-until-done socket)]
+          (do
+            (.close socket)
+            (= response [(quoterise "yes")])))))
+    (catch Exception e false)))

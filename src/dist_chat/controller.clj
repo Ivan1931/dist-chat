@@ -8,7 +8,7 @@
          [{:host host :port port :message message-text}]
          (let [message (make-transmission {:date (.toString (Date.)) 
                                            :message message-text
-                                           :alias my-alias})
+                                           :alias @my-alias})
                socket (create-socket host port)]
            (do (log-info (str "Sending to " socket)
                          message)
@@ -22,7 +22,7 @@
                      (try (alter contacts add-message-to-contact
                                            host
                                            {:date (Date.)
-                                            :alias my-alias
+                                            :alias @my-alias
                                             :message message-text
                                             :reply true})
                                 (catch Exception e (log-exception "Error when writing the message we sent to contacts" e)))

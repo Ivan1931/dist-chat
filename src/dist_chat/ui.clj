@@ -2,28 +2,55 @@
   (:require [seesaw.core :refer :all]
             [seesaw.mig :refer [mig-panel]]
             [seesaw.dev :refer [show-options]]
-            [seesaw.bind :as b]))
+            [seesaw.bind :as b]
+            [seesaw.color :refer [color]]
+            [seesaw.font :refer [font]]
+            [cheshire.core :refer [generate-string]])
+  (:import org.pushingpixels.substance.api.SubstanceLookAndFeel))
+
+;; Contact online shown in title bar
+;; Red button to delete a contact
+;; Continuous save watch
+;; Color send button green
+;; If it's not too much trouble, get a bloody skin to work...
 
 
-;; Figure out how to embed panels
-;; Create some test data - done
-;; Render test data on a panel
-;; Display panel in split
-;; Add text area for sending messages
-;; Figure out how we are going to change between different contacts in gui
-;; {:ip {:messages [messages] :online boolean :last-seen date :aliases [string] :meta {}}
+(defn- set-skin
+  [skin-name]
+  (SubstanceLookAndFeel/setSkin 
+    (.getClassName (.get (SubstanceLookAndFeel/getAllSkins) skin-name))))
+
+(def save-messages-action
+  (menu-item :text "Save" 
+             :listen [:action (fn [e] 
+                                (save-contacts))]))
+
+(def new-alias-action
+  (menu-item :text "New Alias"
+             :listen [:action (fn [e]
+                                (when-let [new-alias (input "Enter your new alias")]
+                                  (do 
+                                    (reset! my-alias new-alias)
+                                    (save-alias new-alias))))]))
+
+(def continuous-save-toggle
+  (menu-item :text "Toggle Continuous Save"
+             :listen [:action (fn [e]
+                                (do 
+                                  (swap! continuous-save not)
+                                  (save-continous-save)))]))
+
+(def main-view
+  (-> (frame :title (str "dist-chat - " @my-alias)
+             :content "Hello there"
+             :size [680 :by 400]
+             :on-close :exit
+             :menubar 
+             (menubar :items 
+                      [(menu :text "File" :items [save-messages-action new-alias-action])]))
+      show!))
 
 
-(def test-data {"/127.0.0.1" {:messages [{:date (Date.) :message "Hello there man" :alias "John" :reply false} 
-                                         {:date (Date.) :message "Hello there man" :alias "John" :reply false} 
-                                         {:date (Date.) :message "Hey man, how are you????" :alias "Jonah" :reply true}]
-                              :online false
-                              :aliases #{"John"}}
-                "/148.34.2.45" {:messages [{:date (Date.) :message "Hello there man" :alias "Nathan" :reply false} 
-                                           {:date (Date.) :message "Hello there man" :alias "Josh" :reply false} 
-                                           {:date (Date.) :message "Hey man, how are you????" :alias "Jonah" :reply true}]
-                                :online true
-                                :aliases #{"Josh" "Nathan"}}})
 (defn message-to-str
   "Takes a message hash and converts it to a string"
   [{date :date
@@ -31,7 +58,7 @@
     alias-text :alias 
     is-reply :reply}]
   (let [sender-alias (if is-reply
-                       "me"
+                       @my-alias
                        alias-text)]
     (str sender-alias ": " 
          "Date: " (.toString date) \newline
@@ -44,25 +71,6 @@
        (map message-to-str)
        (string/join \newline)))
 
-(def save-action
-  (menu-item :text "Save" 
-             :listen [:action (fn [e] 
-                                (println "I'm a saver"))]))
-
-(def exit-action
-  (menu-item :text "Exit"
-             :listen [:action (fn [e]
-                                (println "I'm an exiter"))]))
-
-(def main-view
-  (-> (frame :title "dist-chat"
-             :content "Hello there"
-             :size [680 :by 400]
-             :on-close :exit
-             :menubar 
-                (menubar :items 
-                  [(menu :text "File" :items [save-action exit-action])]))
-      show!))
 
 (defn display
   "Sets the content of a larger view"
@@ -76,14 +84,19 @@
   [content]
   (display main-view content))
 
+(defn create-alias-string
+  [ip alias-set]
+  (if alias-set
+    (string/join "/" alias-set)
+    ip))
+
 (defn render-contact
   [renderer data]
   (let [{:keys [value selected?]} data
         host-address (value 0)
         aliases (get-in value [1 :aliases])
-        alias-string (if aliases 
-                       (string/join "/" aliases)
-                       (value 0))]
+        alias-string (create-alias-string (value 0)
+                                          (aliases))]
     (config! renderer :text alias-string)))
 
 (def contacts-list-box
@@ -110,7 +123,11 @@
              (let [last-selected (.getSelectedIndex contacts-list-box)]
                (do 
                  (config! contacts-list-box :model new-state)
-                 (.setSelectedIndex contacts-list-box last-selected)))))
+                 (.setSelectedIndex contacts-list-box last-selected)
+                 (try
+                   (when @continuous-save
+                     (try (save-contacts new-state)
+                          (catch Exception e (log-exception "Problem writing to save-contacts" e)))))))))
 
 (defn add-contact-handler
   "Adds a new contact to our contacts hash"
@@ -127,7 +144,6 @@
   (button :text "Add Contact"
           :listen [:action add-contact-handler]))
 
-
 (def contacts-display-area
   (border-panel :north contacts-list-box
                 :south add-contact-button))
@@ -135,12 +151,37 @@
 (defn message-display-area
   [contact]
   (scrollable
-    (text :multi-line? true
-          :editable? false
-          :wrap-lines? true
-          :text (-> contact
-                    (get-in [1 :messages])
-                    messages-to-str))))
+    (listbox :model (get-in contact [1 :messages])
+             :renderer (reify javax.swing.ListCellRenderer
+                         (getListCellRendererComponent
+                           [this component value idx isSelected cellHasFocus]
+                           (let [date (value :date)
+                                 is-reply (value :reply)
+                                 sender-alias (if is-reply
+                                                @my-alias
+                                                (value :alias))
+                                 background-color (if is-reply
+                                                    (color 220 240 220)
+                                                    (color 220 220 240))
+                                 allignment (if is-reply
+                                              :west
+                                              :east)
+                                 message-text (value :message)]
+                             (border-panel allignment 
+                                           (border-panel
+                                             :north (label :text sender-alias
+                                                           :font "ARIAL-BOLD-17")
+                                             :center (label :text (.toString date)
+                                                            :font (font :name :monospaced 
+                                                                        :size 10 
+                                                                        :styles #{:italic}))
+                                             :south (text :text message-text
+                                                          :background background-color
+                                                          :multi-line? true
+                                                          :editable? false)
+                                             :background background-color
+                                             :hgap 10
+                                             :vgap 5))))))))
 
 (def message-field
   (text :text ""
@@ -157,7 +198,7 @@
     (future 
       (do (log-info "Sending message from GUI" message-hash)
           (try (let [send-result (send-message message-hash)]
-                   (text! message-field ""))
+                 (text! message-field ""))
                (catch Exception e
                  (log-exception "Error sending message from GUI" e)))))))
 
@@ -165,7 +206,9 @@
   [contact]
   (border-panel :center message-field
                 :east (button :text "Send"
-                              :action (action :handler message-send-handler))
+                              :action (action :handler message-send-handler)
+                              :tip "Send message"
+                              :background (color 220 240 220))
                 :vgap 5 :hgap 5 :border 3))
 
 (defn chat-interface
@@ -177,7 +220,8 @@
 
 (def main-split
   (left-right-split contacts-display-area
-                    (chat-interface (.elementAt (config contacts-list-box :model) 0))))
+                    (chat-interface (when (< 0 (count @contacts))
+                                      (.elementAt (config contacts-list-box :model) 0)))))
 
 (defn update-chat-interface
   [contact]
@@ -191,3 +235,25 @@
           (update-chat-interface (value e))))
 
 (display-main main-split)
+
+(def online-check-wait 30000)
+
+(defn start-online-check-loop
+  []
+  (future 
+    (loop [current-user (selection contacts-list-box)]
+      (let [ip (current-user 0)
+            aliases (get-in current-user [1 :aliases])
+            alias-string (create-alias-string ip aliases)
+            is-online (is-online? ip inbox-port)
+            title (str alias-string " - " (if is-online? "online" "offline"))]
+        (do
+          (config! main-view :title title)
+          (Thread/sleep online-check-wait)
+          (recur (selection contacts-list-box)))))))
+
+(with-handler! (var start-online-check-loop)
+  "Finds any exception that occurs during the check online phase"
+  (fn [e] (log-exception "There was an error whilst performing check online loop" e)))
+
+(start-online-check-loop)
